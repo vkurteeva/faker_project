@@ -45,28 +45,24 @@ def parse_size_input(size_input):
 def generate_neutral_content(size_target, format_type, source_lines):
     """Генерирует осмысленный текст с точным индикатором ожидания."""
     content = ""
-    progress_step = size_target // 10  # Обновляем прогресс каждые 10% (примерно)
-    current_progress = 0
+    current_size = 0
     max_dots = 10  # Максимальное количество точек для индикатора
-    total_added = 0  # Фактическое количество добавленных элементов
+    current_progress = 0
 
-    # Для txt: добавляем полные строки из source_lines с индикатором
+    # Для txt: добавляем и дублируем строки из source_lines с индикатором
     if format_type == 'txt':
         lines_added = 0
-        avg_line_length = sum(len(line.encode('utf-8')) for line in source_lines) / len(
-            source_lines) if source_lines else 1
-        total_lines = min(size_target // int(avg_line_length) + 1, len(source_lines) * 10)  # Оценка
-        for _ in range(total_lines):
-            if len(content.encode('utf-8')) >= size_target:
-                break
+        if not source_lines:
+            return content
+        while current_size < size_target:
             selected_line = random.choice(source_lines) + "\n"
             line_size = len(selected_line.encode('utf-8'))
-            if len(content.encode('utf-8')) + line_size <= size_target:
+            if current_size + line_size <= size_target:
                 content += selected_line
+                current_size += line_size
                 lines_added += 1
-                total_added += 1
-                # Обновляем индикатор только при значительном прогрессе
-                new_progress = min((total_added / (total_lines if total_lines > 0 else 1)) * 100, 100)
+                # Обновляем индикатор на основе текущего размера
+                new_progress = min((current_size / size_target) * 100, 100)
                 if new_progress >= current_progress + 10:
                     current_progress = new_progress // 10 * 10
                     progress_dots = min((current_progress / 100) * max_dots, max_dots)
@@ -74,7 +70,11 @@ def generate_neutral_content(size_target, format_type, source_lines):
                         f"\rГенерация: [{'#' * int(progress_dots) + '.' * (max_dots - int(progress_dots))}] {current_progress:.0f}%")
                     sys.stdout.flush()
             else:
-                break
+                # Добавляем остаток строки, чтобы достичь размера
+                remaining_bytes = size_target - current_size
+                if remaining_bytes > 0 and selected_line:
+                    content += selected_line[:remaining_bytes].encode('utf-8').decode('utf-8', errors='ignore')
+                    current_size = size_target
         # Устанавливаем 100% при завершении
         if lines_added > 0:
             sys.stdout.write(f"\rГенерация: [{'#' * max_dots}] 100%")
@@ -85,15 +85,13 @@ def generate_neutral_content(size_target, format_type, source_lines):
     elif format_type == 'csv':
         header = "ItemID;Description;Status\n"
         content = header
-        header_size = len(header.encode('utf-8'))
-        if header_size > size_target:
-            return header[:size_target]
+        current_size = len(header.encode('utf-8'))
         item_id = 1
         rows_added = 1  # Учитываем заголовок
         sample_row = "1;Имя: Иван, Пол: Мужской, Возраст: 25;Активен\n"
         avg_row_length = len(sample_row.encode('utf-8'))
         total_rows = min(size_target // avg_row_length + 1, size_target // 50)  # Оценка
-        while len(content.encode('utf-8')) < size_target:
+        while current_size < size_target:
             name = fake.first_name()  # Генерируем имя
             gender = random.choice(["Мужской", "Женский"])  # Случайный пол
             age = random.randint(15, 60)  # Случайный возраст от 15 до 60
@@ -101,13 +99,13 @@ def generate_neutral_content(size_target, format_type, source_lines):
             status = random.choice(["Активен", "Неактивен", "В ожидании"])
             row = f"{item_id};{description};{status}\n"
             row_size = len(row.encode('utf-8'))
-            if len(content.encode('utf-8')) + row_size <= size_target:
+            if current_size + row_size <= size_target:
                 content += row
+                current_size += row_size
                 item_id += 1
                 rows_added += 1
-                total_added += 1
-                # Обновляем индикатор только при значительном прогрессе
-                new_progress = min((total_added / (total_rows if total_rows > 0 else 1)) * 100, 100)
+                # Обновляем индикатор на основе текущего размера
+                new_progress = min((current_size / size_target) * 100, 100)
                 if new_progress >= current_progress + 10:
                     current_progress = new_progress // 10 * 10
                     progress_dots = min((current_progress / 100) * max_dots, max_dots)
@@ -115,7 +113,11 @@ def generate_neutral_content(size_target, format_type, source_lines):
                         f"\rГенерация: [{'#' * int(progress_dots) + '.' * (max_dots - int(progress_dots))}] {current_progress:.0f}%")
                     sys.stdout.flush()
             else:
-                break
+                # Добавляем остаток строки, чтобы достичь размера
+                remaining_bytes = size_target - current_size
+                if remaining_bytes > 0 and row:
+                    content += row[:remaining_bytes].encode('utf-8').decode('utf-8', errors='ignore')
+                    current_size = size_target
         # Устанавливаем 100% при завершении
         if rows_added > 1:  # Учитываем заголовок
             sys.stdout.write(f"\rГенерация: [{'#' * max_dots}] 100%")
